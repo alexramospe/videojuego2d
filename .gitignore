@@ -1,0 +1,13 @@
+# Archivos generados por Unity
+[Ll]ibrary/
+[Ll]ogs/
+[Tt]emp/
+[Tt]arget/
+[Aa]ssets/AssetStoreTools*
+
+.DS_Store
+Thumbs.db
+
+Build/
+Builds/
+
