@@ -6,21 +6,24 @@ public class CharacterController : MonoBehaviour
 {
     public float velocidad;
     public float fuerzaSalto;
-    public LayerMask capaSuelo;
+    public float fuerzaGolpe;
     public float saltosMaximos;
+    public LayerMask capaSuelo;
+    public AudioClip sonidoSalto;
 
-    private Rigidbody2D rigibody;
-    private BoxCollider2D boxColider;
+    private Rigidbody2D rigidBody;
+    private BoxCollider2D boxCollider;
     private bool mirandoDerecha = true;
     private float saltosRestantes;
-    private Animator animation;
-    // Start is called before the first frame update
-    void Start()
+    private Animator animator;
+    private bool puedeMoverse = true;
+
+    private void Start()
     {
-        
-        rigibody = GetComponent<Rigidbody2D>();
-        boxColider = GetComponent<BoxCollider2D>();
-        animation = GetComponent<Animator>();
+        rigidBody = GetComponent<Rigidbody2D>();
+        boxCollider = GetComponent<BoxCollider2D>();
+        saltosRestantes = saltosMaximos;
+        animator = GetComponent<Animator>();
     }
 
     // Update is called once per frame
@@ -29,51 +32,95 @@ public class CharacterController : MonoBehaviour
         ProcesarMovimiento();
         ProcesarSalto();
     }
+
+    bool EstaEnSuelo()
+    {
+        RaycastHit2D raycastHit = Physics2D.BoxCast(boxCollider.bounds.center, new Vector2(boxCollider.bounds.size.x, boxCollider.bounds.size.y), 0f, Vector2.down, 0.2f, capaSuelo);
+        return raycastHit.collider != null;
+    }
+
+    void ProcesarSalto()
+    {
+        if (EstaEnSuelo())
+        {
+            saltosRestantes = saltosMaximos;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Space) && saltosRestantes > 0)
+        {
+            saltosRestantes--;
+            rigidBody.velocity = new Vector2(rigidBody.velocity.x, 0f);
+            rigidBody.AddForce(Vector2.up * fuerzaSalto, ForceMode2D.Impulse);
+            AudioManager.Instance.ReproducirSonido(sonidoSalto);
+        }
+    }
+
     void ProcesarMovimiento()
     {
+        // Si no puede moverse, salimos de la funcion
+        if (!puedeMoverse) return;
+
+        // Lógica de movimiento
         float inputMovimiento = Input.GetAxis("Horizontal");
 
         if (inputMovimiento != 0f)
         {
-            animation.SetBool("isRunning", true);
+            animator.SetBool("isRunning", true);
         }
         else
         {
-            animation.SetBool("isRunning", false);
+            animator.SetBool("isRunning", false);
         }
-         rigibody.velocity = new Vector2(inputMovimiento * velocidad, rigibody.velocity.y);
 
-        GestionarMovimiento(inputMovimiento);
-    }
-    
-    bool enSuelo()
-    {
-        RaycastHit2D raycastHit = Physics2D.BoxCast(boxColider.bounds.center, new Vector2(boxColider.bounds.size.x, boxColider.bounds.size.y),0f, Vector2.down,0.2f,capaSuelo);
-        return raycastHit.collider != null;
-    }
-    void GestionarMovimiento(float inputMovimiento)
-    {
+        rigidBody.velocity = new Vector2(inputMovimiento * velocidad, rigidBody.velocity.y);
 
-        if ( (mirandoDerecha == true && inputMovimiento < 0) || (mirandoDerecha == false &&inputMovimiento > 0))
+        GestionarOrientacion(inputMovimiento);
+    }
+
+    void GestionarOrientacion(float inputMovimiento)
+    {
+        // Si se cumple condición
+        if ((mirandoDerecha == true && inputMovimiento < 0) || (mirandoDerecha == false && inputMovimiento > 0))
         {
+            // Ejecutar código de volteado
             mirandoDerecha = !mirandoDerecha;
-            transform.localScale = new Vector2(-transform.localScale.x,transform.localScale.y);
+            transform.localScale = new Vector2(-transform.localScale.x, transform.localScale.y);
         }
     }
-    void ProcesarSalto()
+
+    public void AplicarGolpe()
     {
-        if (enSuelo())
-        {
-            saltosRestantes = saltosMaximos;
-        }
-        if (Input.GetKeyDown(KeyCode.Space) && saltosRestantes>0)
-        {
-            saltosRestantes--;
-            rigibody.velocity = new Vector2(rigibody.velocity.x, 0f);
-            rigibody.AddForce(Vector2.up * fuerzaSalto, ForceMode2D.Impulse);
 
+        puedeMoverse = false;
 
+        Vector2 direccionGolpe;
+
+        if (rigidBody.velocity.x > 0)
+        {
+            direccionGolpe = new Vector2(-1, 1);
         }
+        else
+        {
+            direccionGolpe = new Vector2(1, 1);
+        }
+
+        rigidBody.AddForce(direccionGolpe * fuerzaGolpe);
+
+        StartCoroutine(EsperarYActivarMovimiento());
     }
 
+    IEnumerator EsperarYActivarMovimiento()
+    {
+        // Esperamos antes de comprobar si esta en el suelo.
+        yield return new WaitForSeconds(0.1f);
+
+        while (!EstaEnSuelo())
+        {
+            // Esperamos al siguiente frame.
+            yield return null;
+        }
+
+        // Si ya está en suelo activamos el movimiento.
+        puedeMoverse = true;
+    }
 }
